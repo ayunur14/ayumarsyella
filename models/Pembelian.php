@@ -1,0 +1,141 @@
+<?php
+class Pembelian {
+    private $conn;
+    private $table_name = "Pembelian";
+    public $id;
+    public $vendor_id;
+    public $user_id;
+    public $total_harga;
+    public $tanggal_pembelian;
+    public $status;
+
+    public function __construct($db) {
+        $this->conn = $db;
+    }
+
+    public function create() {
+    // Query yang benar harus pakai VALUES
+    $query = "INSERT INTO " . $this->table_name . " 
+              (vendor_id, user_id, total_harga, tanggal_pembelian, status)
+              VALUES (:vendor_id, :user_id, :total_harga, :tanggal_pembelian, :status)";
+
+    $stmt = $this->conn->prepare($query);
+
+    // Sanitasi input
+    $this->vendor_id = htmlspecialchars(strip_tags($this->vendor_id));
+    $this->user_id = htmlspecialchars(strip_tags($this->user_id));
+    $this->total_harga = htmlspecialchars(strip_tags($this->total_harga));
+    $this->tanggal_pembelian = htmlspecialchars(strip_tags($this->tanggal_pembelian));
+    $this->status = htmlspecialchars(strip_tags($this->status));
+
+    // Bind parameter
+    $stmt->bindParam(':vendor_id', $this->vendor_id);
+    $stmt->bindParam(':user_id', $this->user_id);
+    $stmt->bindParam(':total_harga', $this->total_harga);
+    $stmt->bindParam(':tanggal_pembelian', $this->tanggal_pembelian);
+    $stmt->bindParam(':status', $this->status);
+
+    // Eksekusi query
+    if ($stmt->execute()) {
+        return $this->conn->lastInsertId();
+    }
+
+    // Log error (opsional)
+    $error = $stmt->errorInfo();
+    error_log("Pembelian create() error: " . print_r($error, true));
+
+    return false;
+}
+
+
+    public function readAll() {
+        $query = "SELECT p.*, s.nama_vendor, u.nama_lengkap as user_name
+                  FROM " . $this->table_name . " p
+                  LEFT JOIN vendor s ON p.vendor_id = s.id
+                  LEFT JOIN users u ON p.user_id = u.id
+                  ORDER BY p.tanggal_pembelian DESC";
+
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+
+        return $stmt;
+    }
+
+    public function readOne() {
+        $query = "SELECT p.*, s.nama_vendor, u.nama_lengkap as user_name
+                  FROM " . $this->table_name . " p
+                  LEFT JOIN vendor s ON p.vendor_id = s.id
+                  LEFT JOIN users u ON p.user_id = u.id
+                  WHERE p.id = :id";
+
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':id', $this->id);
+        $stmt->execute();
+
+        if ($stmt->rowCount() > 0) {
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            $this->vendor_id = $row['vendor_id'];
+            $this->user_id = $row['user_id'];
+            $this->total_harga = $row['total_harga'];
+            $this->tanggal_pembelian = $row['tanggal_pembelian'];
+            $this->status = $row['status'];
+            return true;
+        }
+        return false;
+    }
+
+    public function readRecent($limit = 10) {
+        $query = "SELECT p.*, s.nama_vendor, u.nama_lengkap as user_name
+                  FROM " . $this->table_name . " p
+                  LEFT JOIN vendor s ON p.vendor_id = s.id
+                  LEFT JOIN users u ON p.user_id = u.id
+                  ORDER BY p.tanggal_pembelian DESC
+                  LIMIT :limit";
+
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt;
+    }
+
+    public function getDetailPembelian($pembelian_id) {
+        $query = "SELECT dp.*, o.nama_pakaian, o.kode_pakaian
+                  FROM detail_pembelian dp
+                  LEFT JOIN pakaian o ON dp.pakaian_id = o.id
+                  WHERE dp.pembelian_id = :pembelian_id";
+
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':pembelian_id', $pembelian_id);
+        $stmt->execute();
+
+        return $stmt;
+    }
+
+    public function getTotalPembelianBulan() {
+        $query = "SELECT COALESCE(SUM(total_harga), 0) as total 
+                  FROM " . $this->table_name . " 
+                  WHERE MONTH(tanggal_pembelian) = MONTH(CURDATE()) 
+                  AND YEAR(tanggal_pembelian) = YEAR(CURDATE())
+                  AND status = 'completed'";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row['total'];
+    }
+
+    public function updateStatus($id, $status) {
+        $query = "UPDATE " . $this->table_name . " SET status=:status WHERE id=:id";
+
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':status', $status);
+        $stmt->bindParam(':id', $id);
+
+        if ($stmt->execute()) {
+            return true;
+        }
+        return false;
+    }
+    }
+
+?>
