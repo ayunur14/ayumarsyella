@@ -72,7 +72,7 @@ if ($role === 'admin' || $role === 'gudang') {
             <ul class="sidebar-nav">
                 <li class="nav-item">
                     <a href="dashboard.php" class="nav-link active">
-                        <i>📊</i> Dashboard
+                        <i>📊</i> Menu utama
                     </a>
                 </li>
                 
